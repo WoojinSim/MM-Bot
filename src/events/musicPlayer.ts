@@ -1,6 +1,6 @@
 import { Client, TextChannel, EmbedBuilder, Message, VoiceChannel } from 'discord.js';
 import { joinVoiceChannel, createAudioPlayer, createAudioResource, getVoiceConnection, VoiceConnection, AudioPlayerStatus } from '@discordjs/voice';
-import ytdl, { videoInfo } from "@distube/ytdl-core";
+import ytdl from "@distube/ytdl-core";
 import ffmpegPath from 'ffmpeg-static';
 import { spawn, ChildProcessWithoutNullStreams } from 'child_process';
 
@@ -21,7 +21,7 @@ let dashboardMessage: Message;
 let lastMessageTime: number = 0;
 let didntPlayStack: number = 0;
 
-// 대시보드 버튼
+// 대시보드 버튼 선언
 const dashboardButton = {
   type: 1, // ActionRow
   components: [
@@ -68,6 +68,9 @@ export default (client: Client) => {
     await channel.bulkDelete(messagesToDelete);
   }
 
+  /**
+   * 봇이 켜졌을 때 실행될 코드
+   */
   client.on("ready", async () => {
     try {
       // 음악 입력채널은 그냥 하드코딩으로 박아두기
@@ -137,6 +140,9 @@ export default (client: Client) => {
     }
   });
 
+  /**
+   * 메세지가 생성됐을 때 실행될 코드
+   */
   client.on("messageCreate", async (message) => {
     try {
       const urlPattern = /^(https?|ftp):\/\/(-\.)?([^\s\/?\.#-]+\.?)+(\/[^\s]*)?$/i;
@@ -145,6 +151,8 @@ export default (client: Client) => {
       if (message.channel.id !== MUSIC_CHANNEL_ID) return; // 입력채널 필터링
       // if (message.channel.id !== MUSIC_CHANNEL_ID && message.channel.id !== "1327091415250894919") return;
       lastMessageTime = Date.now();
+
+      // 예외처리) URL 형식이 아님
       if (!urlPattern.test(message.content)) {
         message.reply({
           content: "저는 유튜브와 유튜브 뮤직 링크만 알아들을 수 있어요. 여기서 잡담을 나누지 말아주세요! <a:pepe_diamondsword_en:1144350198030663740>",
@@ -152,6 +160,8 @@ export default (client: Client) => {
         });
         return;
       }
+
+      // 예외처리) 유튜브 관련 URL이 아님
       if (!ytdl.validateURL(message.content)) {
         message.reply({
           content: "제가 인식할 수 있는 유튜브 링크가 아니에요! 링크가 정상적인지 확인해봐요. <:pepe_cry:1056632607284137984>",
@@ -160,8 +170,8 @@ export default (client: Client) => {
         return;
       }
 
+      // 분기처리) 음성채널 연결 상태 확인
       let connection = getVoiceConnection(message.guild!.id);
-
       if (!connection) {
         if (!message.member?.voice.channel) {
           message.reply({
@@ -171,13 +181,13 @@ export default (client: Client) => {
           return;
         }
       }
+      // 일단 음성채널 접속 시도, 이미 접속해 있다면 이 단락은 지나쳐가질 것.
+      // TODO: 개선점을 찾을 것
       connection = joinVoiceChannel({
         channelId: message.member!.voice.channel!.id,
         guildId: message.guild!.id,
         adapterCreator: message.guild!.voiceAdapterCreator,
       });
-
-      //deleteMsgWithOutDashboard();
 
       // 음악 재생 대기열 추가
       const musicInfo = await ytdl.getInfo(message.content, { lang: "ko" });
@@ -191,11 +201,8 @@ export default (client: Client) => {
         info: musicDetails,
         author: message.author.id
       });
+      if (!isMusicPlaying) playMusic(connection!);
       updateDashboard();
-
-      if (!isMusicPlaying) {
-        playMusic(connection!);
-      }
     } catch(error) {
       console.error(error);
       message.reply({
@@ -206,8 +213,8 @@ export default (client: Client) => {
   });
 
   /**
-   * 음악 재생
-   * @param connection 음성 연결 
+   * 음악 재생 함수
+   * @param connection 음성 연결 상태
    */
   const playMusic = async (connection: VoiceConnection) => {
     try {
@@ -271,7 +278,7 @@ export default (client: Client) => {
   };
 
   /**
-   * 대시보드 업데이트
+   * 대시보드 업데이트 함수
    */
   const updateDashboard = async () => {
     const channel = await client.channels.fetch("1302975766253797396");
